@@ -115,6 +115,7 @@ def assign_subforms(spec_files, labels_file,
     Raises:
         ValueError: _description_
     """
+    print('BBBBBBBBBBBBBBBBBB')
     spec_files = Path(spec_files)
     label_path = Path(labels_file)
 
@@ -122,6 +123,7 @@ def assign_subforms(spec_files, labels_file,
     labels_df = pd.read_csv(label_path, sep="\t").astype(str)
     if debug:
         labels_df = labels_df[:50]
+    print('AAAAAAAAAAAAAAAA')
     # Define output directory name
     output_dir_p: Path = Path(output_dir)
     if output_dir_p is None:
@@ -134,8 +136,6 @@ def assign_subforms(spec_files, labels_file,
     if spec_files.suffix == ".mgf":
         # Input specs
         parsed_specs = utils.parse_spectra_mgf(str(spec_files))
-        print(parsed_specs[0][1][0][1])
-        print(parsed_specs[0][1][0][1].shape)
         input_specs = [utils.process_spec_file(*i) for i in parsed_specs]
         spec_names = [i[0][feature_id] for i in parsed_specs]
         input_specs = list(zip(spec_names, input_specs))
