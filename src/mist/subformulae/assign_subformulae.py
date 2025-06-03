@@ -137,6 +137,8 @@ def assign_subforms(spec_files, labels_file,
         # Input specs
         parsed_specs = utils.parse_spectra_mgf(spec_files)
         input_specs = [utils.process_spec_file(*i) for i in parsed_specs]
+        print(input_specs[0])
+        print(parsed_specs[0])
         spec_names = [i[0][feature_id] for i in parsed_specs]
         input_specs = list(zip(spec_names, input_specs))
     elif spec_files.is_dir():
