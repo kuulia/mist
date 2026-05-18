@@ -174,3 +174,4 @@ notebooks/molecule.png
 notebooks/molecule.svg
 notebooks/spec.png
 data_processing/neims/gecko_EIMS_spectra/df_neims_gecko+_3_9_22.pkl
+*.pkl

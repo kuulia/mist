@@ -1,0 +1,18 @@
+# neims_preprocessing configuration  –  Li original
+# Run with:  python neims_preprocessing.py config_li_preprocess.yaml
+# Prerequisite:  python neims_output_to_mgf.py config_li_original.yaml
+
+mgf_file:     data/neims/atmomaccs/li_spectra.mgf
+dataset_name: li
+output_dir:   data/neims/atmomaccs/mist_inputs/li
+
+split_mode: random
+n_test: 16384
+n_val:  10240
+seed:   42
+
+num_workers:      8
+mass_diff_thresh: 20
+max_formulae:     50
+
+log_level: INFO

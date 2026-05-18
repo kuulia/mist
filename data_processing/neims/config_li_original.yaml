@@ -1,0 +1,11 @@
+# neims_output_to_mgf configuration  –  gecko original molecules
+# Run with:  python neims_output_to_mgf.py config_wang_original.yaml
+
+spectra_dir: data/neims/atmomaccs/li/NEIMS/original  # directory containing the NEIMS output folders e.g. "000000"
+smiles_csv:  data/neims/atmomaccs/li/compounds/original/li_all_smiles_cleaned.csv # CSV file containing the SMILES strings
+output:      data/neims/atmomaccs/li_spectra.mgf # output MGF file
+
+smiles_col: null      # auto-detects 'SMILES' column
+id_prefix:  li # name of the dataset, used as prefix for spectrum titles in the MGF file
+min_peaks:  5         # minimum number of peaks required for a spectrum to be included in the output (sanity check for EI-MS)
+log_level:  INFO

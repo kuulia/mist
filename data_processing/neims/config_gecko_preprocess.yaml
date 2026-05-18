@@ -1,0 +1,18 @@
+# neims_preprocessing configuration  –  gecko original
+# Run with:  python neims_preprocessing.py config_gecko_preprocess.yaml
+# Prerequisite:  python neims_output_to_mgf.py config_gecko_original.yaml
+
+mgf_file:     data/neims/gecko_EIMS_spectra/mist_inputs/gecko_spectra.mgf
+dataset_name: gecko
+output_dir:   data/neims/gecko_EIMS_spectra/mist_inputs/gecko
+
+split_mode: random
+n_test: 16384
+n_val:  10240
+seed:   42
+
+num_workers:      8
+mass_diff_thresh: 20
+max_formulae:     50
+
+log_level: INFO
