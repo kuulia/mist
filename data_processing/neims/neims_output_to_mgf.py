@@ -1,17 +1,25 @@
 """
-neims_output_to_mgf.py  –  Convert NEIMS output folders to a single MGF file.
+neims_output_to_mgf.py  –  Convert NEIMS output to a single MGF file.
 
+Two NEIMS output formats are supported:
+
+Legacy format
+-------------
 NEIMS produces one folder per molecule (000000/, 000001/, …), each containing
 an annotated.sdf with a predicted EI-MS spectrum.  A separate CSV holds the
 corresponding SMILES.  This script aligns them by row index and writes every
 valid molecule-spectrum pair to one MGF file.
 
-Alignment guarantee
--------------------
-Row *i* (0-based) of the CSV maps to folder ``f"{i:06d}"``.  The script
-verifies alignment by comparing the heavy-atom count read from the SDF mol
-block against the atom count computed from the SMILES via RDKit.  Mismatches
-are logged and skipped; they indicate a corrupt or misaligned dataset.
+Alignment guarantee: row *i* (0-based) of the CSV maps to folder f"{i:06d}".
+The script verifies alignment by comparing the heavy-atom count from the SDF
+mol block against the RDKit count from the SMILES.
+
+New format
+----------
+NEIMS writes all spectra to a single concatenated SDF file.  Each record
+begins with the SMILES string as the mol-name field, followed by a dummy
+mol block (0 atoms), the PREDICTED SPECTRUM data block, and a $$$$ separator.
+Because SMILES and spectrum are co-located, no external alignment check is needed.
 
 Dependencies: Python ≥ 3.8, pandas, numpy, rdkit
 
@@ -45,18 +53,34 @@ log = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class Config:
-    spectra_dir: Path
-    smiles_csv: Path
     output: Path
+    format: str = "legacy"          # "legacy" | "new"
+    # Legacy-mode fields
+    spectra_dir: Optional[Path] = None
+    smiles_csv: Optional[Path] = None
+    # New-mode fields
+    sdf_file: Optional[Path] = None
+    # Shared fields
     smiles_col: Optional[str] = None
     id_prefix: Optional[str] = None
     min_peaks: int = 5
     log_level: str = "INFO"
 
     def __post_init__(self):
-        self.spectra_dir = Path(self.spectra_dir)
-        self.smiles_csv = Path(self.smiles_csv)
         self.output = Path(self.output)
+        if self.format not in ("legacy", "new"):
+            raise ValueError(f"format must be 'legacy' or 'new', got {self.format!r}")
+        if self.format == "legacy":
+            if self.spectra_dir is None or self.smiles_csv is None:
+                raise ValueError(
+                    "Legacy format requires 'spectra_dir' and 'smiles_csv' in the config."
+                )
+            self.spectra_dir = Path(self.spectra_dir)
+            self.smiles_csv = Path(self.smiles_csv)
+        else:
+            if self.sdf_file is None:
+                raise ValueError("New format requires 'sdf_file' in the config.")
+            self.sdf_file = Path(self.sdf_file)
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +220,83 @@ def parse_sdf(sdf_path: Path, min_peaks: int = 5) -> tuple:
 
 
 # ---------------------------------------------------------------------------
+# New-format SDF parser
+# ---------------------------------------------------------------------------
+
+def parse_new_format_sdf(
+    sdf_path: Path,
+    id_prefix: str,
+    min_peaks: int = 5,
+) -> list[dict]:
+    """
+    Parse a new-format NEIMS SDF file (single concatenated file).
+
+    Each record layout:
+      Line 1 : SMILES string (mol-name field)
+      Lines 2-N : dummy mol block (0 atoms) + PREDICTED SPECTRUM data block
+      $$$$ : record terminator
+
+    Because SMILES and spectrum are co-located there is no alignment check.
+    Returns a list of record dicts with keys: feature_id, smiles, mol, spectrum.
+    """
+    with open(sdf_path, "r", errors="replace") as fh:
+        content = fh.read()
+
+    records: list[dict] = []
+    n_bad_smiles = 0
+    n_bad_spectrum = 0
+
+    blocks = content.split("$$$$")
+    record_idx = 0
+    for block in blocks:
+        lines = block.strip().splitlines()
+        if not lines:
+            continue
+
+        # First non-empty line is the SMILES
+        smiles = None
+        for line in lines:
+            stripped = line.strip()
+            if stripped:
+                smiles = stripped
+                break
+
+        if smiles is None:
+            continue
+
+        mol = validate_smiles(smiles)
+        if mol is None:
+            log.debug("Record %d: invalid SMILES '%s' — skipping.", record_idx, smiles)
+            n_bad_smiles += 1
+            record_idx += 1
+            continue
+
+        spectrum = _parse_spectrum(lines)
+        if spectrum is None or len(spectrum) < min_peaks:
+            log.debug("Record %d: no valid spectrum — skipping.", record_idx)
+            n_bad_spectrum += 1
+            record_idx += 1
+            continue
+
+        records.append(
+            {
+                "feature_id": f"{id_prefix}_{record_idx}",
+                "smiles": smiles,
+                "mol": mol,
+                "spectrum": spectrum,
+            }
+        )
+        record_idx += 1
+
+    log.info(
+        "New-format SDF: %d kept, %d invalid SMILES, %d missing/short spectra "
+        "(out of %d records read)",
+        len(records), n_bad_smiles, n_bad_spectrum, record_idx,
+    )
+    return records
+
+
+# ---------------------------------------------------------------------------
 # SMILES validation
 # ---------------------------------------------------------------------------
 
@@ -272,10 +373,41 @@ def write_mgf(
 # ---------------------------------------------------------------------------
 
 def convert(cfg: Config) -> None:
+    """Dispatch to the appropriate converter based on cfg.format."""
+    if cfg.format == "new":
+        _convert_new(cfg)
+    else:
+        _convert_legacy(cfg)
+
+
+def _convert_new(cfg: Config) -> None:
+    """Convert a new-format (single SDF) NEIMS output to MGF."""
+    assert cfg.sdf_file is not None
+    output_path = cfg.output
+    id_prefix = cfg.id_prefix if cfg.id_prefix is not None else cfg.sdf_file.stem
+
+    records = parse_new_format_sdf(cfg.sdf_file, id_prefix, cfg.min_peaks)
+
+    if not records:
+        raise RuntimeError("No valid records found in new-format SDF. Nothing written.")
+
+    write_mgf(records, output_path)
+
+    written = output_path.read_text().count("BEGIN IONS")
+    if written != len(records):
+        raise RuntimeError(
+            f"MGF write verification failed: expected {len(records)} spectra "
+            f"in {output_path} but counted {written} 'BEGIN IONS' blocks."
+        )
+    log.info("Wrote %d spectra to %s (verified)", len(records), output_path)
+
+
+def _convert_legacy(cfg: Config) -> None:
     """
     Align SMILES from cfg.smiles_csv with spectra from cfg.spectra_dir and
     write an MGF file to cfg.output.
     """
+    assert cfg.spectra_dir is not None and cfg.smiles_csv is not None
     spectra_dir = cfg.spectra_dir
     smiles_csv = cfg.smiles_csv
     output_path = cfg.output
@@ -456,28 +588,35 @@ def convert(cfg: Config) -> None:
 _TEMPLATE = """\
 # neims_output_to_mgf configuration
 # Run with:  python neims_output_to_mgf.py config.yaml
+#
+# Two formats are supported.  Uncomment the relevant block below.
 
-# --- Required ---
+# ── LEGACY format ────────────────────────────────────────────────────────────
+# NEIMS produced one numbered folder per molecule (000000/, 000001/, …) and a
+# separate CSV file with the SMILES.
+#
+# format: legacy  # (default; may be omitted)
+#
+# spectra_dir: data/neims/my_dataset/NEIMS/original
+# smiles_csv:  data/neims/my_dataset/compounds/original/dataset.csv
+# smiles_col: null  # auto-detects SMILES / smiles / Modified_SMILES / Original_SMILES
 
-# Directory containing NEIMS numbered output folders (000000/, 000001/, …).
-# Each sub-folder must contain an annotated.sdf file.
-spectra_dir: data/neims/my_dataset/NEIMS/original
+# ── NEW format ───────────────────────────────────────────────────────────────
+# NEIMS wrote all spectra to a single SDF file.  Each record begins with the
+# SMILES string as the mol-name field, followed by a dummy mol block and the
+# PREDICTED SPECTRUM data block, separated by $$$$.
+#
+# format: new
+#
+# sdf_file: data/neims/my_dataset/output.sdf
 
-# CSV file whose row i (0-based) corresponds to folder i.
-# An auto-saved pandas index column (Unnamed: 0) is dropped automatically.
-smiles_csv:  data/neims/my_dataset/compounds/original/dataset.csv
+# ── Shared ───────────────────────────────────────────────────────────────────
 
 # Destination MGF file (parent directory is created if it does not exist).
-output:      data/neims/my_dataset/spectra.mgf
-
-# --- Optional ---
-
-# SMILES column name in the CSV.
-# Leave as null to auto-detect from: SMILES, smiles, Modified_SMILES, Original_SMILES.
-smiles_col: null
+output: data/neims/my_dataset/spectra.mgf
 
 # Prefix used for FEATURE_ID in the MGF (e.g. "gecko" → FEATURE_ID=gecko_0).
-# Leave as null to use the name of the spectra_dir folder.
+# Leave as null to use spectra_dir name (legacy) or sdf_file stem (new).
 id_prefix: null
 
 # Minimum number of peaks a spectrum must have to be kept.
@@ -530,12 +669,24 @@ def load_yaml_config(path: Path) -> Config:
             key = key.strip()
             data[key] = _parse_scalar(value)
 
-    required = ("spectra_dir", "smiles_csv", "output")
-    missing = [k for k in required if k not in data or data[k] is None]
-    if missing:
-        raise ValueError(
-            f"Config file {path} is missing required keys: {missing}"
-        )
+    if "output" not in data or data["output"] is None:
+        raise ValueError(f"Config file {path} is missing required key: 'output'")
+
+    fmt = str(data.get("format", "legacy")).lower()
+    if fmt not in ("legacy", "new"):
+        raise ValueError(f"format must be 'legacy' or 'new', got {fmt!r}")
+
+    if fmt == "legacy":
+        missing = [k for k in ("spectra_dir", "smiles_csv") if not data.get(k)]
+        if missing:
+            raise ValueError(
+                f"Legacy format config {path} is missing required keys: {missing}"
+            )
+    else:
+        if not data.get("sdf_file"):
+            raise ValueError(
+                f"New format config {path} is missing required key: 'sdf_file'"
+            )
 
     valid_levels = ("DEBUG", "INFO", "WARNING", "ERROR")
     log_level = str(data.get("log_level", "INFO")).upper()
@@ -549,9 +700,11 @@ def load_yaml_config(path: Path) -> Config:
         raise ValueError(f"min_peaks must be a positive integer, got {min_peaks!r}")
 
     return Config(
-        spectra_dir=Path(data["spectra_dir"]),
-        smiles_csv=Path(data["smiles_csv"]),
         output=Path(data["output"]),
+        format=fmt,
+        spectra_dir=Path(data["spectra_dir"]) if data.get("spectra_dir") else None,
+        smiles_csv=Path(data["smiles_csv"]) if data.get("smiles_csv") else None,
+        sdf_file=Path(data["sdf_file"]) if data.get("sdf_file") else None,
         smiles_col=data.get("smiles_col") or None,
         id_prefix=data.get("id_prefix") or None,
         min_peaks=min_peaks,
