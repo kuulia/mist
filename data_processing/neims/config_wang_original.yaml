@@ -1,11 +1,24 @@
-# neims_output_to_mgf configuration  –  gecko original molecules
-# Run with:  python neims_output_to_mgf.py config_wang_original.yaml
+# Run with:  python neims_output_to_mgf.py config_li_original.yaml
+# ── NEW format ───────────────────────────────────────────────────────────────
+# NEIMS wrote all spectra to a single SDF file.  Each record begins with the
+# SMILES string as the mol-name field, followed by a dummy mol block and the
+# PREDICTED SPECTRUM data block, separated by $$$$.
+#
+format: new
+#
+sdf_file: data/neims/atmomaccs_new/wang/NEIMS/original/spectra.sdf
 
-spectra_dir: data/neims/atmomaccs/wang/NEIMS/original  # directory containing the NEIMS output folders e.g. "000000"
-smiles_csv:  data/neims/atmomaccs/wang/compounds/original/dataset.csv # CSV file containing the SMILES strings
-output:      data/neims/atmomaccs/wang_spectra.mgf # output MGF file
+# ── Shared ───────────────────────────────────────────────────────────────────
 
-smiles_col: null      # auto-detects 'SMILES' column
-id_prefix:  wang # name of the dataset, used as prefix for spectrum titles in the MGF file
-min_peaks:  5         # minimum number of peaks required for a spectrum to be included in the output (sanity check for EI-MS)
-log_level:  INFO
+# Destination MGF file (parent directory is created if it does not exist).
+output: data/neims/atmomaccs_new/wang/wang.mgf
+
+# Prefix used for FEATURE_ID in the MGF (e.g. "gecko" → FEATURE_ID=gecko_0).
+# Leave as null to use spectra_dir name (legacy) or sdf_file stem (new).
+id_prefix: wang
+
+# Minimum number of peaks a spectrum must have to be kept.
+min_peaks: 5
+
+# Logging verbosity: DEBUG, INFO, WARNING, or ERROR.
+log_level: INFO

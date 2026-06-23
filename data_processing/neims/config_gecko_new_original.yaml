@@ -1,0 +1,10 @@
+# neims_output_to_mgf configuration  –  gecko_new dataset (new NEIMS format)
+# Run with:  python neims_output_to_mgf.py data_processing/neims/config_gecko_new_original.yaml
+
+format:   new
+sdf_file: data/neims/gecko_new/new_spectra.sdf
+output:   data/neims/gecko_new/mist_inputs/gecko_new_spectra.mgf
+
+id_prefix: gecko_new
+min_peaks: 5
+log_level: INFO

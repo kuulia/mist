@@ -9,19 +9,19 @@ SCRIPT="data_processing/neims/neims_output_to_mgf.py"
 CONFIG_DIR="data_processing/neims"
 
 configs=(
-    config_gecko_original.yaml
-    config_gecko_tms.yaml
+    #config_gecko_original.yaml
+    #config_gecko_tms.yaml
     config_fc_original.yaml
-    config_fc_tms.yaml
+    #config_fc_tms.yaml
     config_kc_original.yaml
-    config_kc_tms.yaml
+    #config_kc_tms.yaml
     config_li_original.yaml
-    config_li_tms.yaml
+    #config_li_tms.yaml
     config_wang_original.yaml
-    config_wang_tms.yaml
-    config_msg_train_original.yaml
-    config_msg_val_original.yaml
-    config_msg_test_original.yaml
+    #config_wang_tms.yaml
+    #config_msg_train_original.yaml
+    #config_msg_val_original.yaml
+    #config_msg_test_original.yaml
 )
 
 n_ok=0
@@ -60,3 +60,15 @@ cat \
     "$MSG_DIR/msg_test_spectra.mgf"  \
     > "$MSG_DIR/spectra_combined.mgf"
 echo "Wrote $MSG_DIR/spectra_combined.mgf"
+
+echo "──────────────────────────────────────────"
+echo "Consolidating ATMOMACCS MGF splits…"
+echo "──────────────────────────────────────────"
+ATMOMACCS_DIR="data/neims/atmomaccs_new"
+cat \
+    "$ATMOMACCS_DIR/ferraz-caetano/ferraz-caetano.mgf" \
+    "$ATMOMACCS_DIR/li/li.mgf"   \
+    "$ATMOMACCS_DIR/wang/wang.mgf"  \
+    "$ATMOMACCS_DIR/kruger-confined/kruger-confined.mgf"  \
+    > "$ATMOMACCS_DIR/spectra_combined.mgf"
+echo "Wrote $ATMOMACCS_DIR/spectra_combined.mgf"

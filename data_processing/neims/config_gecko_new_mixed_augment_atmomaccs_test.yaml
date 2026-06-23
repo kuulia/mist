@@ -1,0 +1,25 @@
+# neims_dataset_builder configuration
+# Combined dataset: gecko_new + mixed_augment (train/val, balanced) + ATMOMACCS (test)
+#
+# Run with:
+#   python data_processing/neims/neims_dataset_builder.py \
+#       data_processing/neims/config_gecko_new_mixed_augment_atmomaccs_test.yaml
+
+# Train/val pool — gecko_new and mixed_augment, deduplicated against each
+# other and against ATMOMACCS.
+source_dir: data/neims/gecko_new/mist_inputs
+source_dir: data/neims/mixed_augment/mist_inputs/mixed_augment
+
+# All ATMOMACCS molecules are forced into the test set.
+test_source_dir: data/neims/atmomaccs_new/mist_inputs
+
+output_dir: data/neims/gecko_new_mixed_augment_atmomaccs_test/mist_inputs
+dataset_name: gecko_new_mixed_augment_atmomaccs_test
+
+# Val is split evenly between gecko_new and mixed_augment regardless of
+# their relative sizes (mixed_augment is much larger).
+n_val: 10240
+balanced_val: true
+
+seed: 42
+log_level: INFO

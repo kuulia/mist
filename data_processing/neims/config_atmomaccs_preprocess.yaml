@@ -1,0 +1,18 @@
+# neims_preprocessing configuration  –  Wang original
+# Run with:  python neims_preprocessing.py config_wang_preprocess.yaml
+# Prerequisite:  python neims_output_to_mgf.py config_wang_original.yaml
+
+mgf_file:     data/neims/atmomaccs_new/spectra_combined.mgf
+dataset_name: atmomaccs
+output_dir:   data/neims/atmomaccs_new/mist_inputs/
+
+split_mode: random
+n_test: 16384
+n_val:  0
+seed:   42
+
+num_workers:      8
+mass_diff_thresh: 20
+max_formulae:     50
+
+log_level: INFO
