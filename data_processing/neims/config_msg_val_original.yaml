@@ -1,0 +1,11 @@
+# neims_output_to_mgf configuration  –  MSG val split
+# Run with:  python neims_output_to_mgf.py config_msg_val_original.yaml
+
+spectra_dir: data/neims/msg/msg-val/NEIMS/original
+smiles_csv:  data/neims/msg/msg-val/compounds/original/dataset.csv
+output:      data/neims/msg/mist_inputs/msg_val_spectra.mgf
+
+smiles_col: null       # auto-detects 'SMILES' column
+id_prefix:  msg-val
+min_peaks:  5
+log_level:  INFO

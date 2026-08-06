@@ -1,4 +1,4 @@
-""" After exporting mgf for augmentation, assign subformulae """
+#""" After exporting mgf for augmentation, assign subformulae """
 dataset_name="canopus_train"
 split_no_ext="canopus_hplus_100_0"
 labels_file="data/paired_spectra/${dataset_name}/aug_iceberg_${dataset_name}/biomols_filtered_smiles_${dataset_name}_labels.tsv"

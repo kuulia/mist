@@ -18,6 +18,6 @@ dependencies:
 - ray-tune
 - umap-learn
 - optuna
-- cudatoolkit=11.1 # may need to modify if cpu only
+#- cudatoolkit=11.1 # may need to modify if cpu only
   #- pytorch::torchvision
   #- torchmetrics

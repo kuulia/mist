@@ -1,0 +1,21 @@
+# neims_dataset_builder configuration
+# Combined dataset: mixed_augment (train/val) + ATMOMACCS (test)
+#
+# Run with:
+#   python data_processing/neims/neims_dataset_builder.py \
+#       data_processing/neims/config_combined_atmomaccs_test.yaml
+
+# Train/val pool — existing split_random.tsv is used; any molecules already
+# in "test" stay there, the rest are re-split into val/train.
+source_dir: data/neims/mixed_augment/mist_inputs/mixed_augment
+
+# All ATMOMACCS molecules are forced into the test set regardless of their
+# existing split assignments.
+test_source_dir: data/neims/atmomaccs_new/mist_inputs
+
+output_dir: data/neims/combined_atmomaccs_test/mist_inputs
+dataset_name: combined_atmomaccs_test
+
+n_val: 10240
+seed: 42
+log_level: INFO

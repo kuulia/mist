@@ -1,0 +1,8 @@
+spectra_dir: data/neims/atmomaccs/li/NEIMS/derivatized  # directory containing the NEIMS output folders e.g. "000000"
+smiles_csv:  data/neims/atmomaccs/li/compounds/derivatized/dataset.csv # CSV file containing the SMILES strings
+output:      data/neims/atmomaccs/li_tms_spectra.mgf # output MGF file
+
+smiles_col: null      # auto-detects 'SMILES' column
+id_prefix:  li_tms # name of the dataset, used as prefix for spectrum titles in the MGF file
+min_peaks:  5         # minimum number of peaks required for a spectrum to be included in the output (sanity check for EI-MS)
+log_level:  INFO

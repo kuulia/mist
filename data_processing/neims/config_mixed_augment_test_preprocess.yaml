@@ -1,0 +1,18 @@
+# neims_preprocessing configuration  –  mixed_augment_test
+# Run with:  python neims_preprocessing.py config_mixed_augment_test_preprocess.yaml
+# Prerequisite:  python neims_output_to_mgf.py config_mixed_augment_test.yaml
+
+mgf_file:     data/neims/mixed_augment_test/spectra.mgf
+dataset_name: mixed_augment_test
+output_dir:   data/neims/mixed_augment_test/mist_inputs/mixed_augment_test
+
+split_mode: random
+n_test: 20480
+n_val:  20480
+seed:   42
+
+num_workers:      4
+mass_diff_thresh: 10
+max_formulae:     20
+
+log_level: INFO

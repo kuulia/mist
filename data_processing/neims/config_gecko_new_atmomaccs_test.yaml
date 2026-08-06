@@ -1,0 +1,19 @@
+# neims_dataset_builder configuration
+# Combined dataset: gecko_new (train/val) + ATMOMACCS (test)
+#
+# Run with:
+#   python data_processing/neims/neims_dataset_builder.py \
+#       data_processing/neims/config_gecko_new_atmomaccs_test.yaml
+
+# Train/val pool — all gecko_new molecules; ATMOMACCS-overlapping ones are stripped.
+source_dir: data/neims/gecko_new/mist_inputs
+
+# All ATMOMACCS molecules are forced into the test set.
+test_source_dir: data/neims/atmomaccs_new/mist_inputs
+
+output_dir: data/neims/gecko_new_atmomaccs_test/mist_inputs
+dataset_name: gecko_new_atmomaccs_test
+
+n_val: 10240
+seed: 42
+log_level: INFO

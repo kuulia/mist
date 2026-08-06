@@ -1,0 +1,11 @@
+# neims_output_to_mgf configuration  –  MSG train split
+# Run with:  python neims_output_to_mgf.py config_msg_train_original.yaml
+
+spectra_dir: data/neims/msg/msg-train/NEIMS/original
+smiles_csv:  data/neims/msg/msg-train/compounds/original/dataset.csv
+output:      data/neims/msg/mist_inputs/msg_train_spectra.mgf
+
+smiles_col: null       # auto-detects 'SMILES' column
+id_prefix:  msg-train
+min_peaks:  5
+log_level:  INFO

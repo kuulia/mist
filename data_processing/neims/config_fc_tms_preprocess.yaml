@@ -1,0 +1,18 @@
+# neims_preprocessing configuration  –  Ferraz-Caetano TMS-derivatized
+# Run with:  python neims_preprocessing.py config_fc_tms_preprocess.yaml
+# Prerequisite:  python neims_output_to_mgf.py config_fc_tms.yaml
+
+mgf_file:     data/neims/atmomaccs/ferraz-caetano_tms_spectra.mgf
+dataset_name: ferraz-caetano_tms
+output_dir:   data/neims/atmomaccs/mist_inputs/ferraz-caetano_tms
+
+split_mode: random
+n_test: 16384
+n_val:  10240
+seed:   42
+
+num_workers:      8
+mass_diff_thresh: 20
+max_formulae:     50
+
+log_level: INFO

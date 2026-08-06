@@ -1,0 +1,24 @@
+# Run with:  python neims_output_to_mgf.py config.yaml
+# ── NEW format ───────────────────────────────────────────────────────────────
+# NEIMS wrote all spectra to a single SDF file.  Each record begins with the
+# SMILES string as the mol-name field, followed by a dummy mol block and the
+# PREDICTED SPECTRUM data block, separated by $$$$.
+#
+format: new
+#
+sdf_file: data/neims/mixed_augment_test/output.sdf
+
+# ── Shared ───────────────────────────────────────────────────────────────────
+
+# Destination MGF file (parent directory is created if it does not exist).
+output: data/neims/mixed_augment_test/spectra.mgf
+
+# Prefix used for FEATURE_ID in the MGF (e.g. "gecko" → FEATURE_ID=gecko_0).
+# Leave as null to use spectra_dir name (legacy) or sdf_file stem (new).
+id_prefix: mix_aug_test
+
+# Minimum number of peaks a spectrum must have to be kept.
+min_peaks: 5
+
+# Logging verbosity: DEBUG, INFO, WARNING, or ERROR.
+log_level: INFO

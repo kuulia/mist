@@ -1,4 +1,4 @@
-""" Assign subformulae """
+#""" Assign subformulae """
 dataset_name="canopus_train"
 output_dir="data/paired_spectra/${dataset_name}/subformulae/default_subformulae"
 python src/mist/subformulae/assign_subformulae.py \

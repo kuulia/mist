@@ -1,4 +1,4 @@
-""" Run magma on all training data"""
+#""" Run magma on all training data"""
 magma_file=src/mist/magma/run_magma.py
 
 echo "Magma on canopus_train"

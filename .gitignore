@@ -165,3 +165,15 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+data_processing/neims/gecko_EIMS_spectra/df_neims_gecko_TMS_3_9_22.pkl
+data_processing/neims/gecko_EIMS_spectra/df_neims_gecko_3_9_22.pkl
+data_processing/neims/gecko_EIMS_spectra/df_neims_gecko.csv
+data_processing/neims/gecko_EIMS_spectra/df_neims_gecko_TMS.csv
+notebooks/molecule_highres.png
+notebooks/molecule.png
+notebooks/molecule.svg
+notebooks/spec.png
+data_processing/neims/gecko_EIMS_spectra/df_neims_gecko+_3_9_22.pkl
+*.pkl
+data_processing/neims/neims_consolidation.zip
+data_processing/neims/gecko_EIMS_spectra/df_neims_gecko_TMS_post_3_9_22.zip
