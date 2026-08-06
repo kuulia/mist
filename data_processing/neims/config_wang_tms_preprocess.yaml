@@ -2,9 +2,9 @@
 # Run with:  python neims_preprocessing.py config_wang_tms_preprocess.yaml
 # Prerequisite:  python neims_output_to_mgf.py config_wang_tms.yaml
 
-mgf_file:     data/neims/atmomaccs/wang_tms_spectra.mgf
+mgf_file:     data/neims/atmomaccs_new/wang/wang_tms.mgf
 dataset_name: wang_tms
-output_dir:   data/neims/atmomaccs/mist_inputs/wang_tms
+output_dir:   data/neims/atmomaccs_new/mist_inputs/wang_tms
 
 split_mode: random
 n_test: 16384

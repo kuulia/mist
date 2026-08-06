@@ -1,0 +1,18 @@
+# neims_preprocessing configuration  –  combined ATMOMACCS TMS-derivatized
+# Run with:  python neims_preprocessing.py config_atmomaccs_tms_preprocess.yaml
+# Prerequisite:  run_all.sh (concatenates the four *_tms.mgf files)
+
+mgf_file:     data/neims/atmomaccs_new/spectra_combined_tms.mgf
+dataset_name: atmomaccs_tms
+output_dir:   data/neims/atmomaccs_new/mist_inputs_tms/
+
+split_mode: random
+n_test: 16384
+n_val:  0
+seed:   42
+
+num_workers:      8
+mass_diff_thresh: 20
+max_formulae:     50
+
+log_level: INFO

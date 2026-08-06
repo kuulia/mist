@@ -2,9 +2,9 @@
 # Run with:  python neims_preprocessing.py config_kc_tms_preprocess.yaml
 # Prerequisite:  python neims_output_to_mgf.py config_kc_tms.yaml
 
-mgf_file:     data/neims/atmomaccs/kruger-confined_tms_spectra.mgf
+mgf_file:     data/neims/atmomaccs_new/kruger-confined/kruger-confined_tms.mgf
 dataset_name: kruger-confined_tms
-output_dir:   data/neims/atmomaccs/mist_inputs/kruger-confined_tms
+output_dir:   data/neims/atmomaccs_new/mist_inputs/kruger-confined_tms
 
 split_mode: random
 n_test: 16384

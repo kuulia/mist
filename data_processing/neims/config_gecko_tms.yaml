@@ -1,11 +1,10 @@
-# neims_output_to_mgf configuration  –  gecko TMS-derivatized molecules
-# Run with:  python neims_output_to_mgf.py config_gecko_tms.yaml
+# neims_output_to_mgf configuration  –  gecko dataset (new NEIMS format)
+# Run with:  python neims_output_to_mgf.py data_processing/neims/config_gecko_tms.yaml
 
-spectra_dir: data/neims/gecko_EIMS_spectra/gecko/NEIMS/derivatized  # directory containing the NEIMS output folders e.g. "000000"
-smiles_csv:  data/neims/gecko_EIMS_spectra/TMS/SMILES_gecko_TMS_corr_nitrate.csv # CSV file containing the SMILES strings
-output:      data/neims/gecko_EIMS_spectra/mist_inputs/gecko_tms_spectra.mgf # output MGF file
+format:   new
+sdf_file: data/neims/gecko_tms/NEIMS/spectra.sdf
+output:   data/neims/gecko_tms/mist_inputs/spectra.mgf
 
-smiles_col: Modified_SMILES   # derivatized CSV has Original_SMILES + Modified_SMILES
-id_prefix:  gecko_tms
-min_peaks:  5
-log_level:  INFO
+id_prefix: gecko_new_tms
+min_peaks: 5
+log_level: INFO
