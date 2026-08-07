@@ -8,7 +8,23 @@ This script reads it and produces the four artifacts MIST needs:
   labels.tsv                      MIST-format labels (dataset, spec, ionization, ...)
   split_random.tsv                random train/val/test split       (split_mode: random)
   split_predefined.tsv            split derived from FEATURE_ID prefix (split_mode: predefined)
+  split_all_test.tsv              every spectrum in test            (split_mode: all_test)
   DATASET_subforms_3_9_22.pkl     subformulae dict keyed by spectrum name
+  subformulae/NAME.json           one subformula file per spectrum  (subform_format: json/both)
+
+Inference datasets (unknown structures)
+---------------------------------------
+For experimental spectra whose molecules are unknown, the SMILES-derived fields
+cannot be computed.  Such a dataset is preprocessed by:
+
+  * omitting SMILES= from the MGF (parse_mgf tolerates its absence), and
+  * pointing `labels_file` at a hand-built labels.tsv that supplies the
+    externally determined `formula` (and `smiles`/`inchikey` placeholders).
+
+When `labels_file` is set, labels.tsv is reused verbatim instead of being
+derived from SMILES; only the row order is aligned to the MGF.  Use
+`split_mode: all_test` and `subform_format: json` so the result is directly
+loadable by MIST's PeakFormula featurizer, which globs `subform_folder/*.json`.
 
 Usage:
   python neims_preprocessing.py config.yaml
@@ -26,12 +42,19 @@ from functools import reduce
 from pathlib import Path
 from typing import Optional
 
+import json
+
 import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem.rdMolDescriptors import CalcMolFormula
 
 log = logging.getLogger(__name__)
+
+# Column order MIST expects in labels.tsv.
+_LABEL_COLS = [
+    "dataset", "spec", "ionization", "formula", "smiles", "inchikey", "instrument",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -43,12 +66,14 @@ class Config:
     mgf_file: Path
     dataset_name: str
     output_dir: Path
+    # reuse an existing labels.tsv instead of deriving one from SMILES
+    labels_file: Optional[Path] = None
     # random split
     n_test: int = 16384
     n_val: int = 10240
     seed: int = 42
     # predefined split – derive label from FEATURE_ID prefix
-    split_mode: str = "random"           # "random" | "predefined"
+    split_mode: str = "random"           # "random" | "predefined" | "all_test"
     train_id_prefix: Optional[str] = None
     val_id_prefix:   Optional[str] = None
     test_id_prefix:  Optional[str] = None
@@ -56,11 +81,24 @@ class Config:
     num_workers: int = 8
     mass_diff_thresh: float = 20.0
     max_formulae: int = 50
+    subform_format: str = "pkl"          # "pkl" | "json" | "both"
+    filter_above_parentmass: bool = False
     log_level: str = "INFO"
 
     def __post_init__(self):
         self.mgf_file = Path(self.mgf_file)
         self.output_dir = Path(self.output_dir)
+        if self.labels_file is not None:
+            self.labels_file = Path(self.labels_file)
+        if self.split_mode not in ("random", "predefined", "all_test"):
+            raise ValueError(
+                "split_mode must be 'random', 'predefined' or 'all_test', "
+                f"got {self.split_mode!r}"
+            )
+        if self.subform_format not in ("pkl", "json", "both"):
+            raise ValueError(
+                f"subform_format must be 'pkl', 'json' or 'both', got {self.subform_format!r}"
+            )
         if self.split_mode == "predefined":
             missing = [k for k, v in [
                 ("train_id_prefix", self.train_id_prefix),
@@ -86,9 +124,16 @@ dataset_name: my_dataset
 # Directory where all output files are written.
 output_dir: data/neims/my_dataset/mist_inputs
 
+# Existing labels.tsv to reuse verbatim instead of deriving one from SMILES.
+# Required for inference datasets whose structures are unknown: the 'formula'
+# column is then taken from this file rather than computed with RDKit.
+# Leave null to derive labels from the SMILES in the MGF.
+labels_file: null
+
 # --- Split settings ---
 # split_mode: random     -> shuffle all spectra, write split_random.tsv
 # split_mode: predefined -> read split from FEATURE_ID prefix, write split_predefined.tsv
+# split_mode: all_test   -> every spectrum to test, write split_all_test.tsv (inference)
 split_mode: random
 n_test: 16384   # used only when split_mode=random
 n_val:  10240   # used only when split_mode=random
@@ -104,6 +149,19 @@ test_id_prefix:  null
 num_workers:      8
 mass_diff_thresh: 20
 max_formulae:     50
+
+# How to write the subformula assignments:
+#   pkl  -> one dict pickle (input to neims_dataset_builder.py)
+#   json -> one NAME.json per spectrum under output_dir/subformulae/ (what
+#           MIST's --subform-folder expects)
+#   both -> write both
+subform_format: pkl
+
+# Drop peaks above PEPMASS + 1 before assigning subformulae, matching
+# mist.utils.process_spec_file.  A no-op on NEIMS-simulated spectra (which never
+# exceed the precursor); set true for experimental spectra, where above-precursor
+# noise would otherwise consume the max_formulae peak budget.
+filter_above_parentmass: false
 
 log_level: INFO
 """
@@ -156,6 +214,7 @@ def load_yaml_config(path: Path) -> Config:
         mgf_file=Path(data["mgf_file"]),
         dataset_name=str(data["dataset_name"]),
         output_dir=Path(data["output_dir"]),
+        labels_file=Path(data["labels_file"]) if data.get("labels_file") else None,
         n_test=int(data.get("n_test", 16384)),
         n_val=int(data.get("n_val", 10240)),
         seed=int(data.get("seed", 42)),
@@ -166,6 +225,8 @@ def load_yaml_config(path: Path) -> Config:
         num_workers=int(data.get("num_workers", 8)),
         mass_diff_thresh=float(data.get("mass_diff_thresh", 20.0)),
         max_formulae=int(data.get("max_formulae", 50)),
+        subform_format=str(data.get("subform_format", "pkl")).lower(),
+        filter_above_parentmass=bool(data.get("filter_above_parentmass", False)),
         log_level=log_level,
     )
 
@@ -179,14 +240,21 @@ def parse_mgf(mgf_path: Path) -> list[dict]:
     Parse the MGF file produced by neims_output_to_mgf.py.
 
     Returns a list of dicts, each with:
-      name   : FEATURE_ID value
-      smiles : SMILES string
-      spec   : (N, 2) float32 array of [mz, intensity] pairs
+      name       : FEATURE_ID value
+      smiles     : SMILES string, or "" when the MGF carries no SMILES= line
+                   (inference datasets, where the structure is unknown)
+      spec       : (N, 2) float32 array of [mz, intensity] pairs
+      parentmass : PEPMASS value as a float, or None when absent
+
+    Only FEATURE_ID and at least one peak are required; a record missing either
+    is dropped.
     """
     records = []
     current_meta: dict = {}
     current_peaks: list = []
     in_block = False
+    n_dropped = 0
+    n_no_smiles = 0
 
     with open(mgf_path, "r", errors="replace") as fh:
         for line in fh:
@@ -196,12 +264,21 @@ def parse_mgf(mgf_path: Path) -> list[dict]:
                 current_meta = {}
                 current_peaks = []
             elif line == "END IONS":
-                if current_peaks and "FEATURE_ID" in current_meta and "SMILES" in current_meta:
+                if current_peaks and "FEATURE_ID" in current_meta:
+                    try:
+                        parentmass = float(current_meta["PEPMASS"])
+                    except (KeyError, ValueError):
+                        parentmass = None
+                    if "SMILES" not in current_meta:
+                        n_no_smiles += 1
                     records.append({
                         "name": current_meta["FEATURE_ID"],
-                        "smiles": current_meta["SMILES"],
+                        "smiles": current_meta.get("SMILES", ""),
                         "spec": np.array(current_peaks, dtype=np.float32),
+                        "parentmass": parentmass,
                     })
+                else:
+                    n_dropped += 1
                 in_block = False
             elif in_block:
                 if "=" in line:
@@ -216,6 +293,14 @@ def parse_mgf(mgf_path: Path) -> list[dict]:
                             pass
 
     log.info("Parsed %d spectra from %s", len(records), mgf_path.name)
+    if n_dropped:
+        log.warning("Dropped %d block(s) with no FEATURE_ID or no peaks", n_dropped)
+    if n_no_smiles:
+        log.info(
+            "%d of %d spectra carry no SMILES= line — treating as an inference "
+            "dataset (set labels_file to supply formulas).",
+            n_no_smiles, len(records),
+        )
     return records
 
 
@@ -269,6 +354,58 @@ def build_labels(df: pd.DataFrame, dataset_name: str) -> pd.DataFrame:
     })
 
 
+def load_existing_labels(labels_path: Path, names: pd.Series) -> pd.DataFrame:
+    """
+    Load a hand-built labels.tsv and align it to the MGF's spectrum order.
+
+    Used for inference datasets, where 'formula' comes from an external
+    annotation rather than from RDKit.  The file is reused verbatim: no column
+    is recomputed.  Every spectrum in the MGF must have a row; extra rows in
+    the labels file are dropped with a warning.
+    """
+    labels = pd.read_csv(labels_path, sep="\t")
+    labels = labels.drop(columns=[c for c in labels.columns if c.startswith("Unnamed")])
+
+    missing_cols = [c for c in ("spec", "formula", "ionization") if c not in labels.columns]
+    if missing_cols:
+        raise ValueError(
+            f"{labels_path} is missing required column(s) {missing_cols}. "
+            f"Found: {list(labels.columns)}"
+        )
+
+    labels["spec"] = labels["spec"].astype(str)
+    dupes = labels["spec"][labels["spec"].duplicated()].unique()
+    if len(dupes):
+        raise ValueError(
+            f"{labels_path} has {len(dupes)} duplicated 'spec' value(s), "
+            f"e.g. {list(dupes[:5])}. Each spectrum needs exactly one row."
+        )
+
+    by_name = labels.set_index("spec")
+    wanted = [str(n) for n in names]
+    missing = [n for n in wanted if n not in by_name.index]
+    if missing:
+        raise ValueError(
+            f"{len(missing)} spectra in the MGF have no row in {labels_path}, "
+            f"e.g. {missing[:5]}. Labels and MGF must describe the same spectra."
+        )
+    n_extra = len(by_name) - len(wanted)
+    if n_extra > 0:
+        log.warning(
+            "%s has %d row(s) with no matching spectrum in the MGF — dropping them.",
+            labels_path.name, n_extra,
+        )
+
+    out = by_name.loc[wanted].reset_index()
+    for col in ("dataset", "smiles", "inchikey", "instrument"):
+        if col not in out.columns:
+            log.warning("%s has no '%s' column — filling with ''.", labels_path.name, col)
+            out[col] = ""
+
+    log.info("Reusing labels from %s (%d rows, aligned to MGF order)", labels_path, len(out))
+    return out[_LABEL_COLS]
+
+
 def build_split(names: pd.Series, n_test: int, n_val: int, seed: int) -> pd.DataFrame:
     n = len(names)
     n_test = min(n_test, n // 5)
@@ -297,6 +434,11 @@ def build_split_predefined(
         return "train"
 
     return pd.DataFrame({"name": names.values, "split": names.apply(_assign).values})
+
+
+def build_split_all_test(names: pd.Series) -> pd.DataFrame:
+    """Assign every spectrum to test — the split for an inference-only dataset."""
+    return pd.DataFrame({"name": names.values, "split": "test"})
 
 
 # ---------------------------------------------------------------------------
@@ -405,8 +547,12 @@ def _process_spec(
 
 def _assign_one(args):
     """Top-level worker so ProcessPoolExecutor can pickle it."""
-    name, spec_arr, formula, ion_type, mass_diff_thresh, max_formulae = args
-    spec = _process_spec(spec_arr, max_peaks=max_formulae)
+    name, spec_arr, formula, ion_type, mass_diff_thresh, max_formulae, parentmass = args
+    spec = _process_spec(
+        spec_arr,
+        parentmass=1e6 if parentmass is None else parentmass,
+        max_peaks=max_formulae,
+    )
     result = {"cand_form": formula, "cand_ion": ion_type, "output_tbl": None}
     if spec is None or ion_type not in _ION_LST or not formula:
         return name, result
@@ -461,13 +607,15 @@ def build_subforms_pkl(
     num_workers: int,
     mass_diff_thresh: float,
     max_formulae: int,
+    filter_above_parentmass: bool = False,
 ) -> dict:
     formula_lookup = dict(zip(labels["spec"], labels["formula"]))
     ion_lookup = dict(zip(labels["spec"], labels["ionization"]))
 
     tasks = [
         (r["name"], r["spec"], formula_lookup.get(r["name"], ""),
-         ion_lookup.get(r["name"], "[M]+"), mass_diff_thresh, max_formulae)
+         ion_lookup.get(r["name"], "[M]+"), mass_diff_thresh, max_formulae,
+         r.get("parentmass") if filter_above_parentmass else None)
         for r in records
     ]
 
@@ -485,8 +633,26 @@ def build_subforms_pkl(
             name, result = _assign_one(task)
             subforms[name] = result
 
-    log.info("Collected %d subformulae entries", len(subforms))
+    n_empty = sum(1 for v in subforms.values() if v["output_tbl"] is None)
+    log.info("Collected %d subformulae entries (%d with no assigned peaks)",
+             len(subforms), n_empty)
     return subforms
+
+
+def write_subform_jsons(subforms: dict, output_dir: Path) -> Path:
+    """
+    Write one NAME.json per spectrum, the layout MIST's --subform-folder expects.
+
+    Mirrors mist/subformulae/assign_subformulae.py: each file holds the
+    cand_form / cand_ion / output_tbl dict for a single spectrum.
+    """
+    subform_dir = output_dir / "subformulae"
+    subform_dir.mkdir(parents=True, exist_ok=True)
+    for name, entry in subforms.items():
+        with open(subform_dir / f"{name}.json", "w") as fh:
+            json.dump(entry, fh, indent=4)
+    log.info("Wrote %d subformula JSON files to %s", len(subforms), subform_dir)
+    return subform_dir
 
 
 # ---------------------------------------------------------------------------
@@ -509,26 +675,45 @@ def run(cfg: Config) -> None:
         raise RuntimeError(f"No spectra parsed from {cfg.mgf_file}")
 
     # ------------------------------------------------------------------
-    # 2. DataFrame pickle
+    # 2. Resolve labels
+    #
+    # An inference dataset has no SMILES to derive formulas from, so its
+    # labels are supplied externally and only re-ordered to match the MGF.
     # ------------------------------------------------------------------
     df = build_dataframe(records)
+
+    if cfg.labels_file is not None:
+        if not cfg.labels_file.exists():
+            raise FileNotFoundError(f"labels_file not found: {cfg.labels_file}")
+        labels = load_existing_labels(cfg.labels_file, df["name"])
+        # Carry the supplied SMILES placeholders into the DataFrame so the two
+        # artifacts agree on what is known about each molecule.
+        df["SMILES"] = labels["smiles"].values
+    else:
+        labels = build_labels(df, ds)
+
+    # ------------------------------------------------------------------
+    # 3. DataFrame pickle and labels.tsv
+    # ------------------------------------------------------------------
     pkl_path = cfg.output_dir / f"df_neims_{ds}_3_9_22.pkl"
     with open(pkl_path, "wb") as fh:
         pickle.dump(df, fh)
     log.info("Wrote %s (%d rows)", pkl_path.name, len(df))
 
-    # ------------------------------------------------------------------
-    # 3. labels.tsv
-    # ------------------------------------------------------------------
-    labels = build_labels(df, ds)
     labels_path = cfg.output_dir / "labels.tsv"
-    labels.to_csv(labels_path, sep="\t", index=True)
-    log.info("Wrote %s", labels_path.name)
+    if cfg.labels_file is not None and cfg.labels_file.resolve() == labels_path.resolve():
+        log.info("labels_file is the output labels.tsv — leaving it untouched.")
+    else:
+        labels.to_csv(labels_path, sep="\t", index=True)
+        log.info("Wrote %s", labels_path.name)
 
     # ------------------------------------------------------------------
     # 4. split TSV
     # ------------------------------------------------------------------
-    if cfg.split_mode == "predefined":
+    if cfg.split_mode == "all_test":
+        split = build_split_all_test(df["name"])
+        split_path = cfg.output_dir / "split_all_test.tsv"
+    elif cfg.split_mode == "predefined":
         split = build_split_predefined(
             df["name"],
             cfg.train_id_prefix,
@@ -547,7 +732,7 @@ def run(cfg: Config) -> None:
              (split["split"] == "test").sum())
 
     # ------------------------------------------------------------------
-    # 5. Subformulae pickle
+    # 5. Subformulae
     # ------------------------------------------------------------------
     subforms = build_subforms_pkl(
         records=records,
@@ -555,11 +740,17 @@ def run(cfg: Config) -> None:
         num_workers=cfg.num_workers,
         mass_diff_thresh=cfg.mass_diff_thresh,
         max_formulae=cfg.max_formulae,
+        filter_above_parentmass=cfg.filter_above_parentmass,
     )
-    subforms_pkl_path = cfg.output_dir / f"{ds}_subforms_3_9_22.pkl"
-    with open(subforms_pkl_path, "wb") as fh:
-        pickle.dump(subforms, fh)
-    log.info("Wrote %s (%d entries)", subforms_pkl_path.name, len(subforms))
+
+    if cfg.subform_format in ("pkl", "both"):
+        subforms_pkl_path = cfg.output_dir / f"{ds}_subforms_3_9_22.pkl"
+        with open(subforms_pkl_path, "wb") as fh:
+            pickle.dump(subforms, fh)
+        log.info("Wrote %s (%d entries)", subforms_pkl_path.name, len(subforms))
+
+    if cfg.subform_format in ("json", "both"):
+        write_subform_jsons(subforms, cfg.output_dir)
 
 
 # ---------------------------------------------------------------------------

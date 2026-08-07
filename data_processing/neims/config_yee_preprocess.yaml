@@ -1,0 +1,34 @@
+# neims_preprocessing configuration  –  yee dataset (INFERENCE, unknown structures)
+# Run with:  python data_processing/neims/neims_preprocessing.py data_processing/neims/config_yee_preprocess.yaml
+#
+# These are experimental GCxGC HRToFMS spectra whose molecules are unknown, so
+# there is no SMILES anywhere in the pipeline:
+#   - yee_test_all.mgf carries no SMILES= line
+#   - yee_labels.tsv supplies the externally assigned 'formula', with 'na'
+#     placeholders for smiles/inchikey
+# Both files were produced by gecko_EIMS_spectra/preprocess_ms_gen.ipynb from
+# data/yee/df_lindsay_test.pkl; neims_output_to_mgf.py is not used here because
+# the input never went through NEIMS.
+
+mgf_file:     data/yee/mist_inputs/yee_test_all.mgf
+dataset_name: yee
+output_dir:   data/yee/mist_inputs
+
+# Reuse the existing labels verbatim — the formulas cannot be recomputed.
+labels_file:  data/yee/mist_inputs/yee_labels.tsv
+
+# Inference only: no training happens on this dataset.
+split_mode: all_test
+
+num_workers:      8
+mass_diff_thresh: 20
+max_formulae:     50
+
+# MIST's --subform-folder globs *.json, so emit the per-spectrum files.
+subform_format: json
+
+# Real EI spectra carry co-eluting/noise peaks above the precursor; without this
+# they would eat into the max_formulae budget before the ppm filter runs.
+filter_above_parentmass: true
+
+log_level: INFO
