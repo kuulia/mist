@@ -1,0 +1,34 @@
+# neims_dataset_builder configuration
+# Combined dataset: gecko_tms + mixed_augment (train/val, balanced)
+#                   + ATMOMACCS TMS (test)
+#
+# TMS-derivatized counterpart of config_gecko_new_mixed_augment_atmomaccs_test.yaml.
+#
+# Run with:
+#   python data_processing/neims/neims_dataset_builder.py \
+#       data_processing/neims/config_gecko_tms_mixed_augment_atmomaccs_tms_test.yaml
+
+# Train/val pool — gecko_tms and mixed_augment, deduplicated against each
+# other and against the ATMOMACCS TMS test molecules.
+source_dir: data/neims/gecko_tms/mist_inputs
+source_dir: data/neims/mixed_augment/mist_inputs/mixed_augment
+
+# All ATMOMACCS TMS molecules are forced into the test set.  Listed per
+# dataset rather than as one pre-combined directory: repeated test_source_dir
+# keys are accumulated, and every molecule from each entry goes to test, so
+# the result is identical to pointing at a single combined directory.
+test_source_dir: data/neims/atmomaccs_new/mist_inputs/ferraz-caetano_tms
+test_source_dir: data/neims/atmomaccs_new/mist_inputs/kruger-confined_tms
+test_source_dir: data/neims/atmomaccs_new/mist_inputs/li_tms
+test_source_dir: data/neims/atmomaccs_new/mist_inputs/wang_tms
+
+output_dir: data/neims/gecko_tms_mixed_augment_atmomaccs_tms_test/mist_inputs
+dataset_name: gecko_tms_mixed_augment_atmomaccs_tms_test
+
+# Val is split evenly between gecko_tms and mixed_augment regardless of
+# their relative sizes (mixed_augment is the larger pool).
+n_val: 10240
+balanced_val: true
+
+seed: 42
+log_level: INFO
