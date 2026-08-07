@@ -15,7 +15,6 @@ import gc
 from tqdm import tqdm
 from mist import utils
 
-
 def get_args():
     """get args"""
     parser = argparse.ArgumentParser()
@@ -86,7 +85,7 @@ def process_spec_file(spec_name: str, spec_files: str, max_inten=0.001, max_peak
     """
     spec_file = Path(spec_files) / f"{spec_name}.ms"
 
-    meta, tuples = utils.parse_spectra(spec_file)
+    meta, tuples = utils.parse_spectra(str(spec_file))
     spec = utils.process_spec_file(meta, tuples)
     return spec_name, spec
 
@@ -95,7 +94,7 @@ def assign_subforms(spec_files, labels_file,
                     mass_diff_thresh: int = 20,
                     mass_diff_type: str = "ppm",
                     inten_thresh: float = 0.001,
-                    output_dir=None,
+                    output_dir: str= '',
                     num_workers: int = 32,
                     feature_id="ID",
                     max_formulae: int = 50,
@@ -108,7 +107,7 @@ def assign_subforms(spec_files, labels_file,
         mass_diff_thresh (int, optional): _description_. Defaults to 20.
         mass_diff_type (str, optional): _description_. Defaults to "ppm".
         inten_thresh (float, optional): _description_. Defaults to 0.001.
-        output_dir (_type_, optional): _description_. Defaults to None.
+        output_dir (_type_, optional): _description_. Defaults to ''.
         num_workers (int, optional): _description_. Defaults to 32.
         feature_id (str, optional): _description_. Defaults to "ID".
         max_formulae (int, optional): _description_. Defaults to 50.
@@ -124,19 +123,20 @@ def assign_subforms(spec_files, labels_file,
     labels_df = pd.read_csv(label_path, sep="\t").astype(str)
     if debug:
         labels_df = labels_df[:50]
-
     # Define output directory name
-    output_dir = Path(output_dir)
-    if output_dir is None:
-        subform_dir = label_path.parent / "subformulae"
+    output_dir_p: Path = Path(output_dir)
+    if output_dir_p is None:
+        output_dir_p = label_path.parent / "subformulae"
         output_dir_name = f"subform_{max_formulae}"
-        output_dir = subform_dir / output_dir_name
+        output_dir_p = subform_dir / output_dir_name
 
-    output_dir.mkdir(exist_ok=True, parents=True)
+    output_dir_p.mkdir(exist_ok=True, parents=True)
 
     if spec_files.suffix == ".mgf":
         # Input specs
-        parsed_specs = utils.parse_spectra_mgf(spec_files)
+        parsed_specs = utils.parse_spectra_mgf(str(spec_files))
+        print(parsed_specs[0][1][0][1])
+        print(parsed_specs[0][1][0][1].shape)
         input_specs = [utils.process_spec_file(*i) for i in parsed_specs]
         #print(input_specs[0])
         #print(parsed_specs[0])
@@ -146,7 +146,7 @@ def assign_subforms(spec_files, labels_file,
         spec_fn_lst = labels_df["spec"].to_list()
         proc_spec_full = partial(
             process_spec_file,
-            spec_files=spec_files,
+            spec_files=str(spec_files),
             max_inten=inten_thresh,
             max_peaks=max_formulae,
         )
@@ -186,7 +186,7 @@ def assign_subforms(spec_files, labels_file,
 
     # Write all output jsons to files
     for output_dict, spec_name in tqdm(zip(output_dict_lst, spec_names)):
-        with open(output_dir / f"{spec_name}.json", "w") as f:
+        with open(output_dir_p / f"{spec_name}.json", "w") as f:
             json.dump(output_dict, f, indent=4)
             f.close()
 

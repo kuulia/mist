@@ -2,9 +2,9 @@
 # Run with:  python neims_preprocessing.py config_fc_tms_preprocess.yaml
 # Prerequisite:  python neims_output_to_mgf.py config_fc_tms.yaml
 
-mgf_file:     data/neims/atmomaccs/ferraz-caetano_tms_spectra.mgf
+mgf_file:     data/neims/atmomaccs_new/ferraz-caetano/ferraz-caetano_tms.mgf
 dataset_name: ferraz-caetano_tms
-output_dir:   data/neims/atmomaccs/mist_inputs/ferraz-caetano_tms
+output_dir:   data/neims/atmomaccs_new/mist_inputs/ferraz-caetano_tms
 
 split_mode: random
 n_test: 16384

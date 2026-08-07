@@ -2,9 +2,9 @@
 # Run with:  python neims_preprocessing.py config_li_tms_preprocess.yaml
 # Prerequisite:  python neims_output_to_mgf.py config_li_tms.yaml
 
-mgf_file:     data/neims/atmomaccs/li_tms_spectra.mgf
+mgf_file:     data/neims/atmomaccs_new/li/li_tms.mgf
 dataset_name: li_tms
-output_dir:   data/neims/atmomaccs/mist_inputs/li_tms
+output_dir:   data/neims/atmomaccs_new/mist_inputs/li_tms
 
 split_mode: random
 n_test: 16384

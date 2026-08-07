@@ -12,13 +12,13 @@ configs=(
     #config_gecko_original.yaml
     #config_gecko_tms.yaml
     config_fc_original.yaml
-    #config_fc_tms.yaml
+    config_fc_tms.yaml
     config_kc_original.yaml
-    #config_kc_tms.yaml
+    config_kc_tms.yaml
     config_li_original.yaml
-    #config_li_tms.yaml
+    config_li_tms.yaml
     config_wang_original.yaml
-    #config_wang_tms.yaml
+    config_wang_tms.yaml
     #config_msg_train_original.yaml
     #config_msg_val_original.yaml
     #config_msg_test_original.yaml
@@ -72,3 +72,14 @@ cat \
     "$ATMOMACCS_DIR/kruger-confined/kruger-confined.mgf"  \
     > "$ATMOMACCS_DIR/spectra_combined.mgf"
 echo "Wrote $ATMOMACCS_DIR/spectra_combined.mgf"
+
+echo "──────────────────────────────────────────"
+echo "Consolidating ATMOMACCS TMS MGF splits…"
+echo "──────────────────────────────────────────"
+cat \
+    "$ATMOMACCS_DIR/ferraz-caetano/ferraz-caetano_tms.mgf" \
+    "$ATMOMACCS_DIR/li/li_tms.mgf"   \
+    "$ATMOMACCS_DIR/wang/wang_tms.mgf"  \
+    "$ATMOMACCS_DIR/kruger-confined/kruger-confined_tms.mgf"  \
+    > "$ATMOMACCS_DIR/spectra_combined_tms.mgf"
+echo "Wrote $ATMOMACCS_DIR/spectra_combined_tms.mgf"

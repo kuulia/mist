@@ -12,8 +12,8 @@ SCRIPT="data_processing/neims/neims_preprocessing.py"
 CONFIG_DIR="data_processing/neims"
 
 configs=(
-    config_gecko_preprocess.yaml
-    config_gecko_tms_preprocess.yaml
+    #config_gecko_preprocess.yaml
+    #config_gecko_tms_preprocess.yaml
     config_fc_preprocess.yaml
     config_fc_tms_preprocess.yaml
     config_kc_preprocess.yaml
@@ -22,7 +22,7 @@ configs=(
     config_li_tms_preprocess.yaml
     config_wang_preprocess.yaml
     config_wang_tms_preprocess.yaml
-    config_msg_preprocess.yaml
+    #config_msg_preprocess.yaml
 )
 
 n_ok=0
